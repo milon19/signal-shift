@@ -11,7 +11,7 @@ Design doc: docs/design.md. Build ONLY the MVP slice below; ignore beta/full-rel
 - No accounts, no database, no LiveKit, no Phaser yet
 
 ## Stack
-- Monorepo with pnpm workspaces: apps/web (React + TS + Vite), apps/server (Node + TS + Socket.IO), packages/shared (types)
+- Monorepo with Yarn (v1) workspaces: apps/web (React + TS + Vite), apps/server (Node + TS + Socket.IO), packages/shared (types)
 - Server is authoritative: clients send commands with commandId; server validates role/phase/version
 - Game state in memory on the server
 

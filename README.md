@@ -11,11 +11,11 @@ packages/shared  Types shared by both (commands, views, socket events)
 ## Running
 
 ```sh
-pnpm install
-pnpm dev:server   # http://localhost:3001 (PORT, CORS_ORIGIN env vars)
-pnpm dev:web      # http://localhost:5173 (VITE_SERVER_URL to point elsewhere)
-pnpm test         # game logic, room manager and Socket.IO integration tests
-pnpm typecheck
+yarn install
+yarn dev:server   # http://localhost:3001 (PORT, CORS_ORIGIN env vars)
+yarn dev:web      # http://localhost:5173 (VITE_SERVER_URL to point elsewhere)
+yarn test         # game logic, room manager and Socket.IO integration tests
+yarn typecheck
 ```
 
 ## Server design
