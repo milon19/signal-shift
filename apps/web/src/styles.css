@@ -1,0 +1,50 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1b1f24;
+  background: #f4f6f8;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+form.card {
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 8px 12px;
+  min-height: 44px;
+}
+
+button.small {
+  min-height: 32px;
+  margin-left: 8px;
+  padding: 2px 8px;
+}
+
+.code {
+  letter-spacing: 0.2em;
+}
+
+.error {
+  color: #a4161a;
+}
