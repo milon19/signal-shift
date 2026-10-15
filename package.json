@@ -2,20 +2,19 @@
   "name": "signal-shift",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.28.0",
+  "packageManager": "yarn@1.22.22",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev:server": "pnpm --filter @signal-shift/server dev",
-    "dev:web": "pnpm --filter @signal-shift/web dev",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
-    "build": "pnpm -r build"
+    "dev:server": "yarn workspace @signal-shift/server dev",
+    "dev:web": "yarn workspace @signal-shift/web dev",
+    "test": "yarn workspace @signal-shift/server test",
+    "typecheck": "yarn workspaces run typecheck",
+    "build": "yarn workspace @signal-shift/web build"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
   }
 }
