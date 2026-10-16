@@ -49,29 +49,33 @@ button.small {
   color: #a4161a;
 }
 
-select {
-  font: inherit;
-  padding: 8px 12px;
-  min-height: 44px;
-}
-
 .muted {
   color: #57606a;
   font-size: 0.9em;
 }
 
-.claim-form {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
+.question {
+  font-size: 1.2em;
+  font-weight: 600;
 }
 
-.claims li {
-  margin-bottom: 12px;
+.clue {
+  background: #fff8db;
+  border-left: 4px solid #e0a800;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 12px 0;
 }
 
-.claims button.small {
-  margin: 4px 8px 0 0;
+.clue h3 {
+  margin: 0 0 4px;
+  font-size: 0.9em;
+  text-transform: uppercase;
+}
+
+.clue p {
+  margin: 0;
+  font-size: 1.1em;
 }
 
 .actions {

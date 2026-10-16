@@ -1,12 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { MIN_PLAYERS, type GameCommand, type PlayerView, type StakeAmount } from "@signal-shift/shared";
+import { MIN_PLAYERS, type GameCommand, type PlayerView } from "@signal-shift/shared";
 import { SERVER_URL, createRoom, forgetSession, joinRoom, sendCommand, socket, tryRejoin } from "./socket";
 
 type Run = (c: GameCommand) => void;
 
-const CLAIM_PHASES = new Set(["ACT_RELAY", "ACT_VERIFY"]);
-const PIN_PHASES = new Set(["ACT_SCAN", "ACT_RELAY", "ACT_VERIFY"]);
-const STAKES: StakeAmount[] = [1, 2, 3];
+const RULES = "Everyone has a secret clue. Talk it through, then the Captain picks the answer.";
 
 export function App() {
   const [view, setView] = useState<PlayerView | null>(null);
@@ -72,6 +70,7 @@ function JoinForm({ online, onError }: { online: boolean; onError: (e: string | 
 
   return (
     <form className="card" onSubmit={(e) => submit(e, code ? "join" : "create")}>
+      <p>{RULES}</p>
       <label>
         Nickname
         <input value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={20} required />
@@ -88,9 +87,8 @@ function JoinForm({ online, onError }: { online: boolean; onError: (e: string | 
 }
 
 function Room({ view, run }: { view: PlayerView; run: Run }) {
-  const me = view.players.find((p) => p.id === view.me.id);
-  const isHost = !!me?.isHost;
-  const nameOf = (id: string) => view.players.find((p) => p.id === id)?.nickname ?? "?";
+  const isHost = !!view.players.find((p) => p.id === view.me.id)?.isHost;
+  const inPlay = view.phase === "ROUND" || view.phase === "REVEAL";
 
   return (
     <>
@@ -98,87 +96,122 @@ function Room({ view, run }: { view: PlayerView; run: Run }) {
         <p>
           Room <strong className="code">{view.roomCode}</strong> · {view.scenarioTitle}
         </p>
-        <p>
-          Phase <strong>{view.phase}</strong>
-          {view.actNumber > 0 && ` · Act ${view.actNumber}/${view.totalActs}`} · Stability {view.stability} · Sync {view.sync}
-          <Countdown deadline={view.phaseDeadline} />
-        </p>
-        {isHost && view.phase === "LOBBY" && (
-          <button disabled={view.players.length < MIN_PLAYERS} onClick={() => run({ type: "START_GAME" })}>
-            Start game ({view.players.length}/{MIN_PLAYERS}+ players)
-          </button>
+        {inPlay && (
+          <p>
+            Round {view.roundNumber}/{view.totalRounds} · Solved {view.solved}
+            <Countdown deadline={view.phaseDeadline} />
+          </p>
         )}
-        {isHost && view.phase !== "LOBBY" && view.phase !== "RESULTS" && (
-          <button onClick={() => run({ type: "ADVANCE_PHASE" })}>Skip to next phase</button>
-        )}
+        {isHost && inPlay && <button onClick={() => run({ type: "ADVANCE_PHASE" })}>Skip to next phase</button>}
       </section>
 
-      <section className="card">
-        <h2>Players</h2>
-        <ul>
-          {view.players.map((p) => (
-            <li key={p.id}>
-              {p.nickname}
-              {p.isHost && " (host)"}
-              {p.role && ` — ${p.role}`}
-              {!p.connected && " · disconnected"}
-              {isHost && view.phase === "LOBBY" && p.id !== view.me.id && (
-                <button className="small" onClick={() => run({ type: "KICK_PLAYER", playerId: p.id })}>
-                  Kick
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {view.outcomes.length > 0 && (
+      {view.phase === "LOBBY" && <Lobby view={view} run={run} isHost={isHost} />}
+      {view.phase === "ROUND" && <RoundPanel view={view} run={run} />}
+      {view.phase === "REVEAL" && <RevealPanel view={view} />}
+      {view.results && (
         <section className="card">
-          <h2>Shift log</h2>
-          <ol>
-            {view.outcomes.map((o, i) => (
-              <li key={i}>
-                {o.narration}{" "}
-                <span className="muted">
-                  ({o.correct ? "correct" : "wrong"}, stability {o.stabilityDelta >= 0 ? "+" : ""}
-                  {o.stabilityDelta})
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-
-      {view.act && <ActPanel view={view} run={run} />}
-      {view.act && view.pinned.length > 0 && (
-        <section className="card">
-          <h2>Pinned clues</h2>
-          <ul>
-            {view.pinned.map((p) => (
-              <li key={p.clueId}>
-                {p.text} <span className="muted">— pinned by {nameOf(p.pinnedBy)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {view.act && (CLAIM_PHASES.has(view.phase) || view.claims.length > 0) && (
-        <ClaimsPanel view={view} run={run} nameOf={nameOf} />
-      )}
-      {view.phase === "ACT_COMMIT" && <CommitPanel view={view} run={run} nameOf={nameOf} />}
-
-      {view.result && (
-        <section className="card">
-          <h2>{view.result.won ? "Incident resolved!" : "Shift over"}</h2>
-          <p>Team score: {view.result.score.total} / 1000</p>
+          <h2>
+            You solved {view.results.solved} of {view.results.total}
+          </h2>
+          <p>{view.results.line}</p>
           {isHost ? (
             <button onClick={() => run({ type: "PLAY_AGAIN" })}>Play again</button>
           ) : (
-            <p className="muted">Waiting for the host to start a new shift.</p>
+            <p className="muted">Waiting for the host…</p>
           )}
         </section>
       )}
     </>
+  );
+}
+
+function Lobby({ view, run, isHost }: { view: PlayerView; run: Run; isHost: boolean }) {
+  return (
+    <section className="card">
+      <p>{RULES}</p>
+      <h2>Players</h2>
+      <ul>
+        {view.players.map((p) => (
+          <li key={p.id}>
+            {p.nickname}
+            {p.isHost && " (host)"}
+            {isHost && p.id !== view.me.id && (
+              <button className="small" onClick={() => run({ type: "KICK_PLAYER", playerId: p.id })}>
+                Kick
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {isHost ? (
+        <button disabled={view.players.length < MIN_PLAYERS} onClick={() => run({ type: "START_GAME" })}>
+          Start game ({view.players.length}/{MIN_PLAYERS}+ players)
+        </button>
+      ) : (
+        <p className="muted">Waiting for the host to start…</p>
+      )}
+    </section>
+  );
+}
+
+function RoundPanel({ view, run }: { view: PlayerView; run: Run }) {
+  const round = view.round!;
+  const captain = view.players.find((p) => p.id === view.captainId);
+  const iAmCaptain = view.captainId === view.me.id;
+
+  return (
+    <section className="card">
+      <h2>{round.title}</h2>
+      <p className="question">{round.question}</p>
+      <div className="clue">
+        <h3>Your clue</h3>
+        <p>{view.me.clue}</p>
+      </div>
+      <p>
+        Captain: <strong>{iAmCaptain ? "You!" : captain?.nickname}</strong>
+        {captain && !captain.connected && " · disconnected"}
+      </p>
+      {iAmCaptain ? (
+        <div className="actions">
+          {round.answers.map((a) => (
+            <button key={a.id} onClick={() => run({ type: "PICK_ANSWER", answerId: a.id })}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <>
+          <ul>
+            {round.answers.map((a) => (
+              <li key={a.id}>{a.label}</li>
+            ))}
+          </ul>
+          <p className="muted">Tell {captain?.nickname} what you think!</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function RevealPanel({ view }: { view: PlayerView }) {
+  const reveal = view.reveal!;
+  const labelOf = (id: string | null) => view.round?.answers.find((a) => a.id === id)?.label;
+
+  return (
+    <section className="card">
+      <h2>{reveal.correct ? "✓ Solved!" : reveal.answerId ? "✗ Wrong answer" : "⏱ Time's up"}</h2>
+      {reveal.answerId && <p>The Captain picked {labelOf(reveal.answerId)}.</p>}
+      <p className="question">{reveal.narration}</p>
+      {!reveal.correct && <p>The right answer was {labelOf(reveal.correctAnswerId)}.</p>}
+      <h3>Everyone's clues</h3>
+      <ul>
+        {reveal.clues.map((c) => (
+          <li key={c.playerId}>
+            <strong>{c.nickname}:</strong> {c.text}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -193,150 +226,4 @@ function Countdown({ deadline }: { deadline: number | null }) {
   // ponytail: trusts the client clock; send server time with each view if players see skewed timers.
   const secs = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
   return <> · ⏱ {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}</>;
-}
-
-function ActPanel({ view, run }: { view: PlayerView; run: Run }) {
-  const act = view.act!;
-  const canPin = view.me.role === "Dispatcher" && view.me.pinsRemaining > 0 && PIN_PHASES.has(view.phase);
-  const pinned = new Set(view.pinned.map((p) => p.clueId));
-
-  return (
-    <section className="card">
-      <h2>{act.title}</h2>
-      <p>{act.briefing}</p>
-      <h3>Your role: {view.me.role}</h3>
-      <ul>
-        {view.me.clues.map((c) => (
-          <li key={c.id}>
-            {c.text}
-            {canPin && !pinned.has(c.id) && (
-              <button className="small" onClick={() => run({ type: "DISPATCH_PIN", clueId: c.id })}>
-                Pin for everyone
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-      {view.me.role === "Dispatcher" && PIN_PHASES.has(view.phase) && (
-        <p className="muted">Pins left this act: {view.me.pinsRemaining}</p>
-      )}
-    </section>
-  );
-}
-
-function ClaimsPanel({ view, run, nameOf }: { view: PlayerView; run: Run; nameOf: (id: string) => string }) {
-  const facts = view.act!.facts;
-  const open = CLAIM_PHASES.has(view.phase);
-  const canAudit = view.me.role === "Auditor" && view.phase === "ACT_VERIFY" && view.me.auditsRemaining > 0;
-  const promptOf = (id: string) => facts.find((f) => f.id === id)?.prompt ?? id;
-
-  return (
-    <section className="card">
-      <h2>Claims</h2>
-      {open && <ClaimForm facts={facts} run={run} />}
-      {view.me.role === "Auditor" && view.phase === "ACT_VERIFY" && (
-        <p className="muted">Audits left this act: {view.me.auditsRemaining}</p>
-      )}
-      {view.claims.length === 0 && <p className="muted">No claims yet.</p>}
-      <ul className="claims">
-        {view.claims.map((c) => {
-          const staked = c.stakes.reduce((sum, s) => sum + s.amount, 0);
-          const mine = c.stakes.find((s) => s.playerId === view.me.id);
-          return (
-            <li key={c.id}>
-              <strong>{nameOf(c.authorId)}</strong>: “{promptOf(c.factId)}” is{" "}
-              <strong>{c.assertion ? "TRUE" : "FALSE"}</strong> — {c.text}
-              <div className="muted">
-                Staked {staked} Sync{mine && ` (you: ${mine.amount})`}
-                {c.status !== "open" && ` · Audit: ${c.status}`}
-                {c.correct !== null && ` · ${c.correct ? "✓ correct" : "✗ wrong"}`}
-              </div>
-              {open && c.status === "open" && !mine && (
-                <div>
-                  {STAKES.map((amount) => (
-                    <button
-                      key={amount}
-                      className="small"
-                      disabled={amount > view.sync}
-                      onClick={() => run({ type: "SYNC_STAKE", claimId: c.id, amount })}
-                    >
-                      Stake {amount}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {canAudit && c.status === "open" && (
-                <button className="small" onClick={() => run({ type: "CLAIM_VERIFY", claimId: c.id })}>
-                  Audit
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-function ClaimForm({ facts, run }: { facts: { id: string; prompt: string }[]; run: Run }) {
-  const [factId, setFactId] = useState(facts[0]?.id ?? "");
-  const [assertion, setAssertion] = useState(true);
-  const [text, setText] = useState("");
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    run({ type: "CLAIM_CREATE", factId, assertion, text });
-    setText("");
-  };
-
-  return (
-    <form className="claim-form" onSubmit={submit}>
-      <label>
-        Fact
-        <select value={factId} onChange={(e) => setFactId(e.target.value)}>
-          {facts.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.prompt}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        I claim it is
-        <select value={String(assertion)} onChange={(e) => setAssertion(e.target.value === "true")}>
-          <option value="true">True</option>
-          <option value="false">False</option>
-        </select>
-      </label>
-      <label>
-        Because…
-        <input value={text} onChange={(e) => setText(e.target.value)} maxLength={200} required />
-      </label>
-      <button type="submit">Post claim</button>
-    </form>
-  );
-}
-
-function CommitPanel({ view, run, nameOf }: { view: PlayerView; run: Run; nameOf: (id: string) => string }) {
-  const operators = view.players.filter((p) => p.role === "Operator");
-
-  return (
-    <section className="card">
-      <h2>Commit</h2>
-      {view.me.role === "Operator" ? (
-        <>
-          <p>You have one attempt. Choose the action:</p>
-          <div className="actions">
-            {view.act!.actions.map((a) => (
-              <button key={a.id} onClick={() => run({ type: "COMMIT_ACTION", actionId: a.id })}>
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        <p className="muted">Waiting for the Operator ({operators.map((p) => nameOf(p.id)).join(", ")}) to commit.</p>
-      )}
-    </section>
-  );
 }
