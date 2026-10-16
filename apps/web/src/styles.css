@@ -48,3 +48,33 @@ button.small {
 .error {
   color: #a4161a;
 }
+
+select {
+  font: inherit;
+  padding: 8px 12px;
+  min-height: 44px;
+}
+
+.muted {
+  color: #57606a;
+  font-size: 0.9em;
+}
+
+.claim-form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.claims li {
+  margin-bottom: 12px;
+}
+
+.claims button.small {
+  margin: 4px 8px 0 0;
+}
+
+.actions {
+  display: grid;
+  gap: 8px;
+}

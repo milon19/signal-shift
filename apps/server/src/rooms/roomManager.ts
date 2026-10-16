@@ -38,6 +38,7 @@ const commandSchema: z.ZodType<GameCommand> = z.discriminatedUnion("type", [
   z.object({ type: z.literal("CLAIM_VERIFY"), claimId: z.string().max(64) }),
   z.object({ type: z.literal("DISPATCH_PIN"), clueId: z.string().max(64) }),
   z.object({ type: z.literal("COMMIT_ACTION"), actionId: z.string().max(64) }),
+  z.object({ type: z.literal("PLAY_AGAIN") }),
 ]);
 
 const envelopeSchema = z.object({

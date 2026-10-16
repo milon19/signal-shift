@@ -33,7 +33,8 @@ export type GameCommand =
   | { type: "SYNC_STAKE"; claimId: string; amount: StakeAmount }
   | { type: "CLAIM_VERIFY"; claimId: string }
   | { type: "DISPATCH_PIN"; clueId: string }
-  | { type: "COMMIT_ACTION"; actionId: string };
+  | { type: "COMMIT_ACTION"; actionId: string }
+  | { type: "PLAY_AGAIN" };
 
 export type GameCommandType = GameCommand["type"];
 

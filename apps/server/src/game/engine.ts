@@ -65,6 +65,8 @@ export interface GameState {
   hostId: string | null;
   /** Join order. */
   players: Player[];
+  /** Lower-cased nicknames the host kicked; they cannot rejoin this room. */
+  kickedNicknames: string[];
   /** Player ids in seat order, fixed at game start; drives role rotation. */
   seats: string[];
   actNumber: number;
@@ -101,6 +103,7 @@ export function createGame(roomCode: string, scenario: Scenario, seed: number): 
     phaseDeadline: null,
     hostId: null,
     players: [],
+    kickedNicknames: [],
     seats: [],
     actNumber: 0,
     actId: null,
@@ -144,6 +147,8 @@ export function addPlayer(
   if (nickname.length < 1 || nickname.length > MAX_NICKNAME) {
     return invalid(`Nickname must be 1-${MAX_NICKNAME} characters`);
   }
+  // ponytail: nickname ban only; a kicked guest can return under a new name. Needs accounts to do better.
+  if (state.kickedNicknames.includes(nickname.toLowerCase())) return invalid("You were removed from this room by the host");
   if (state.players.some((p) => p.nickname.toLowerCase() === nickname.toLowerCase())) {
     return invalid("Nickname already taken");
   }
@@ -250,7 +255,9 @@ export function applyCommand(state: GameState, playerId: string, command: GameCo
       if (!isHost) return unauthorised("Only the host can kick");
       if (state.phase !== "LOBBY") return invalid("Players can only be kicked in the lobby");
       if (command.playerId === playerId) return invalid("Host cannot kick themselves");
-      if (!findPlayer(state, command.playerId)) return invalid("No such player");
+      const target = findPlayer(state, command.playerId);
+      if (!target) return invalid("No such player");
+      state.kickedNicknames.push(target.nickname.toLowerCase());
       removePlayer(state, command.playerId);
       return ok;
     }
@@ -335,6 +342,21 @@ export function applyCommand(state: GameState, playerId: string, command: GameCo
       if (!action) return invalid("Unknown action");
       participate(state, playerId);
       resolveAct(state, action.id, now);
+      return ok;
+    }
+
+    case "PLAY_AGAIN": {
+      if (!isHost) return unauthorised("Only the host can start a new shift");
+      if (state.phase !== "RESULTS") return invalid("The shift is still running");
+      // Back to the lobby with the connected players, a fresh game and new seating.
+      // Disconnected players are dropped, as they would be from any lobby.
+      Object.assign(state, createGame(state.roomCode, state.scenario, (state.seed + 1) >>> 0), {
+        version: state.version,
+        hostId: state.hostId,
+        players: state.players.filter((p) => p.connected),
+        kickedNicknames: state.kickedNicknames,
+      });
+      bump(state);
       return ok;
     }
 
