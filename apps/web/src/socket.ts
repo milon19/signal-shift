@@ -7,7 +7,7 @@ import type {
   ServerToClientEvents,
 } from "@signal-shift/shared";
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "http://localhost:3001";
+export const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "http://localhost:3001";
 const SESSION_KEY = "signal-shift:session";
 
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, { autoConnect: true });

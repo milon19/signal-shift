@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { MIN_PLAYERS, type GameCommand, type PlayerView, type StakeAmount } from "@signal-shift/shared";
-import { createRoom, forgetSession, joinRoom, sendCommand, socket, tryRejoin } from "./socket";
+import { SERVER_URL, createRoom, forgetSession, joinRoom, sendCommand, socket, tryRejoin } from "./socket";
 
 type Run = (c: GameCommand) => void;
 
@@ -11,6 +11,7 @@ const STAKES: StakeAmount[] = [1, 2, 3];
 export function App() {
   const [view, setView] = useState<PlayerView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connection, setConnection] = useState<"connecting" | "up" | "down">(socket.connected ? "up" : "connecting");
 
   useEffect(() => {
     const onState = (v: PlayerView) => setView(v);
@@ -19,15 +20,23 @@ export function App() {
       setView(null);
       setError("You were removed from the room by the host.");
     };
-    const onConnect = () => void tryRejoin();
+    const onConnect = () => {
+      setConnection("up");
+      void tryRejoin();
+    };
+    const onDown = () => setConnection("down");
     socket.on("game:state", onState);
     socket.on("room:kicked", onKicked);
     socket.on("connect", onConnect);
+    socket.on("disconnect", onDown);
+    socket.on("connect_error", onDown);
     if (socket.connected) onConnect();
     return () => {
       socket.off("game:state", onState);
       socket.off("room:kicked", onKicked);
       socket.off("connect", onConnect);
+      socket.off("disconnect", onDown);
+      socket.off("connect_error", onDown);
     };
   }, []);
 
@@ -39,13 +48,19 @@ export function App() {
   return (
     <main>
       <h1>Signal Shift</h1>
+      {connection === "down" && (
+        <p role="alert" className="error">
+          Can't reach the game server at {SERVER_URL}. Retrying…
+        </p>
+      )}
+      {connection === "connecting" && <p className="muted">Connecting to the game server…</p>}
       {error && <p role="alert" className="error">{error}</p>}
-      {view ? <Room view={view} run={run} /> : <JoinForm onError={setError} />}
+      {view ? <Room view={view} run={run} /> : <JoinForm online={connection === "up"} onError={setError} />}
     </main>
   );
 }
 
-function JoinForm({ onError }: { onError: (e: string | null) => void }) {
+function JoinForm({ online, onError }: { online: boolean; onError: (e: string | null) => void }) {
   const [nickname, setNickname] = useState("");
   const [code, setCode] = useState("");
 
@@ -65,7 +80,9 @@ function JoinForm({ onError }: { onError: (e: string | null) => void }) {
         Room code (leave empty to host)
         <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={4} />
       </label>
-      <button type="submit">{code ? "Join room" : "Create room"}</button>
+      <button type="submit" disabled={!online}>
+        {code ? "Join room" : "Create room"}
+      </button>
     </form>
   );
 }
@@ -154,6 +171,11 @@ function Room({ view, run }: { view: PlayerView; run: Run }) {
         <section className="card">
           <h2>{view.result.won ? "Incident resolved!" : "Shift over"}</h2>
           <p>Team score: {view.result.score.total} / 1000</p>
+          {isHost ? (
+            <button onClick={() => run({ type: "PLAY_AGAIN" })}>Play again</button>
+          ) : (
+            <p className="muted">Waiting for the host to start a new shift.</p>
+          )}
         </section>
       )}
     </>

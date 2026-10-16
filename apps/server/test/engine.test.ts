@@ -56,6 +56,16 @@ describe("lobby", () => {
     expect(state.players.map((p) => p.id)).toEqual(["p1", "p2"]);
   });
 
+  it("stops a kicked nickname from rejoining, case-insensitively", () => {
+    const state = lobby(3);
+    expectAccepted(state, "p1", { type: "KICK_PLAYER", playerId: "p3" });
+    expect(addPlayer(state, { id: "p3b", nickname: " PLAYER 3 ", token: "t" })).toEqual({
+      status: "invalid",
+      error: "You were removed from this room by the host",
+    });
+    expect(addPlayer(state, { id: "p4", nickname: "Player 4", token: "t4" }).status).toBe("accepted");
+  });
+
   it("frees lobby seats on disconnect and passes host on", () => {
     const state = lobby(3);
     setConnected(state, "p1", false);
@@ -220,6 +230,44 @@ describe("commit and branching", () => {
     expect(state.phaseDeadline).toBeNull();
     expect(state.result?.won).toBe(true);
     expect(state.result?.score).toMatchObject({ objectives: 450, efficiency: 200, recovery: 100, claims: 0 });
+  });
+
+  it("play again returns connected players to a fresh lobby, host only, from RESULTS only", () => {
+    const state = started();
+    expect(run(state, "p1", { type: "PLAY_AGAIN" })).toEqual({ status: "invalid", error: "The shift is still running" });
+    commit(state, "open_gate_a");
+    advanceTo(state, "ACT_SCAN");
+    commit(state, "reroute_observatory");
+    advanceTo(state, "ACT_SCAN");
+    commit(state, "launch_east");
+    advanceTo(state, "RESULTS");
+    setConnected(state, "p5", false);
+    const version = state.version;
+
+    expect(run(state, "p2", { type: "PLAY_AGAIN" }).status).toBe("unauthorised");
+    expectAccepted(state, "p1", { type: "PLAY_AGAIN" });
+
+    expect(state).toMatchObject({
+      phase: "LOBBY",
+      phaseDeadline: null,
+      actNumber: 0,
+      actId: null,
+      roles: {},
+      seats: [],
+      stability: scenario.startingStability,
+      sync: scenario.startingSync,
+      claims: [],
+      outcomes: [],
+      result: null,
+      hostId: "p1",
+    });
+    expect(state.players.map((p) => p.id)).toEqual(["p1", "p2", "p3", "p4"]);
+    expect(state.version).toBeGreaterThan(version);
+    expect(state.seed).not.toBe(42);
+
+    addPlayer(state, { id: "p6", nickname: "Six", token: "t6" });
+    expectAccepted(state, "p1", { type: "START_GAME" });
+    expect(state.phase).toBe("ACT_SCAN");
   });
 
   it("ends early at zero stability but still produces a scored debrief", () => {
