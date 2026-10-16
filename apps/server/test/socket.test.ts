@@ -88,7 +88,7 @@ describe("Socket.IO rooms", () => {
     expect(result.status).toBe("unauthorised");
   });
 
-  it("host starts the game and each player receives only their own clues", async () => {
+  it("host starts, each player sees only their own clue, and the Captain's pick reveals everyone's", async () => {
     const host = await client();
     const created = await create(host, "P1");
     if (!created.ok) throw new Error(created.error);
@@ -100,14 +100,30 @@ describe("Socket.IO rooms", () => {
     }
     const everyone = [host, ...guests];
     expect((await send(host, { commandId: "start", command: { type: "START_GAME" } })).status).toBe("accepted");
-    const views = await Promise.all(everyone.map((c) => c.until((v) => v.phase === "ACT_SCAN")));
+    const views = await Promise.all(everyone.map((c) => c.until((v) => v.phase === "ROUND")));
 
-    expect(new Set(views.map((v) => v.me.role)).size).toBe(5);
-    const clueSets = views.map((v) => v.me.clues.map((c) => c.id).join());
-    expect(new Set(clueSets).size).toBe(5);
+    const clues = views.map((v) => v.me.clue);
+    expect(new Set(clues).size).toBe(5);
+    views.forEach((v, i) => {
+      const serialised = JSON.stringify(v);
+      for (const other of clues.filter((_, j) => j !== i)) expect(serialised).not.toContain(other);
+    });
 
     const dup = await send(host, { commandId: "start", command: { type: "START_GAME" } });
     expect(dup.status).toBe("duplicate");
+
+    const captainId = views[0]!.captainId;
+    const captainIndex = views.findIndex((v) => v.me.id === captainId);
+    const notCaptain = everyone[(captainIndex + 1) % 5]!;
+    const pick = { type: "PICK_ANSWER", answerId: "gate_c" } as const;
+    expect((await send(notCaptain, { commandId: "p", command: pick })).status).toBe("unauthorised");
+    expect((await send(everyone[captainIndex]!, { commandId: "p", command: pick })).status).toBe("accepted");
+
+    const reveal = await host.until((v) => v.phase === "REVEAL");
+    expect(reveal.reveal).toMatchObject({ answerId: "gate_c", correct: true });
+    expect(new Set(reveal.reveal!.clues.map((c) => c.text))).toEqual(new Set(clues));
+    expect(reveal.reveal!.clues.map((c) => c.nickname).sort()).toEqual(["P1", "P2", "P3", "P4", "P5"]);
+    expect(reveal.solved).toBe(1);
   });
 
   it("host can kick a player in the lobby", async () => {

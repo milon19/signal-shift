@@ -1,117 +1,62 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { ROLES } from "@signal-shift/shared";
 
-const clueSchema = z.object({ id: z.string().min(1), text: z.string().min(1) });
+/** A game is always three rounds. */
+export const ROUNDS_PER_GAME = 3;
+export const ANSWERS_PER_ROUND = 3;
+export const CLUES_PER_ROUND = 5;
 
-const outcomeFields = {
-  stabilityDelta: z.number().int(),
-  narration: z.string(),
-  /** Next act id, or null when this is the final act. */
-  next: z.string().nullable(),
-};
-
-const actSchema = z.object({
-  title: z.string(),
-  briefing: z.string(),
-  facts: z.array(z.object({ id: z.string().min(1), prompt: z.string(), truth: z.boolean() })).min(1),
-  clues: z.object(
-    Object.fromEntries(ROLES.map((r) => [r, z.array(clueSchema).min(1)])) as Record<
-      (typeof ROLES)[number],
-      z.ZodArray<typeof clueSchema>
-    >,
-  ),
-  actions: z
-    .array(
-      z.object({ id: z.string().min(1), label: z.string(), correct: z.boolean(), ...outcomeFields }),
-    )
-    .min(2),
-  timeout: z.object(outcomeFields),
+const answerSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  correct: z.boolean(),
+  narration: z.string().min(1),
 });
 
-const durationsSchema = z.object({
-  ACT_SCAN: z.number().positive(),
-  ACT_RELAY: z.number().positive(),
-  ACT_VERIFY: z.number().positive(),
-  ACT_COMMIT: z.number().positive(),
-  CONSEQUENCE: z.number().positive(),
-  HANDOFF: z.number().positive(),
+const roundSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  question: z.string().min(1),
+  answers: z.array(answerSchema).length(ANSWERS_PER_ROUND),
+  clues: z.array(z.string().min(1)).length(CLUES_PER_ROUND),
+  timeout: z.string().min(1),
 });
 
 export const scenarioSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  startingStability: z.number().int().positive(),
-  startingSync: z.number().int().nonnegative(),
-  auditsPerAct: z.number().int().nonnegative(),
-  pinsPerAct: z.number().int().nonnegative(),
-  phaseDurationsSec: durationsSchema,
-  startActId: z.string(),
-  acts: z.record(actSchema),
+  id: z.string().min(1),
+  title: z.string().min(1),
+  roundSeconds: z.number().positive(),
+  revealSeconds: z.number().positive(),
+  /** resultLines[n] is shown when the team solved n rounds. */
+  resultLines: z.array(z.string().min(1)).length(ROUNDS_PER_GAME + 1),
+  rounds: z.array(roundSchema).length(ROUNDS_PER_GAME),
 });
 
 export type Scenario = z.infer<typeof scenarioSchema>;
-export type ScenarioAct = Scenario["acts"][string];
-export type ScenarioAction = ScenarioAct["actions"][number];
-export type TimedPhase = keyof Scenario["phaseDurationsSec"];
+export type ScenarioRound = Scenario["rounds"][number];
 
-/** Standard Shift is always three acts. */
-export const STANDARD_SHIFT_ACTS = 3;
-
-/**
- * Parses and checks the structural rules that the schema alone cannot express:
- * every act reference resolves, ids are unique, and every branch is exactly
- * STANDARD_SHIFT_ACTS long.
- */
+/** Parses scenario JSON, throwing a readable error naming the offending field. */
 export function parseScenario(raw: unknown): Scenario {
-  const scenario = scenarioSchema.parse(raw);
-  const actIds = new Set(Object.keys(scenario.acts));
-  if (!actIds.has(scenario.startActId)) {
-    throw new Error(`startActId "${scenario.startActId}" does not exist`);
+  const parsed = scenarioSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`);
+    throw new Error(`Invalid scenario: ${issues.join("; ")}`);
   }
-
-  const clueIds = new Set<string>();
-  for (const [actId, act] of Object.entries(scenario.acts)) {
-    for (const clue of Object.values(act.clues).flat()) {
-      if (clueIds.has(clue.id)) throw new Error(`duplicate clue id "${clue.id}"`);
-      clueIds.add(clue.id);
-    }
-    assertUnique(act.facts.map((f) => f.id), `fact id in act "${actId}"`);
-    assertUnique(act.actions.map((a) => a.id), `action id in act "${actId}"`);
-    if (!act.actions.some((a) => a.correct)) {
-      throw new Error(`act "${actId}" has no correct action`);
-    }
-    for (const outcome of [...act.actions, act.timeout]) {
-      if (outcome.next !== null && !actIds.has(outcome.next)) {
-        throw new Error(`act "${actId}" references unknown act "${outcome.next}"`);
-      }
+  const scenario = parsed.data;
+  assertUnique(scenario.rounds.map((r) => r.id), "round id");
+  for (const round of scenario.rounds) {
+    assertUnique(round.answers.map((a) => a.id), `answer id in round "${round.id}"`);
+    const correct = round.answers.filter((a) => a.correct).length;
+    if (correct !== 1) {
+      throw new Error(`Invalid scenario: round "${round.id}" must have exactly one correct answer (has ${correct})`);
     }
   }
-
-  // Every path from the start must last exactly STANDARD_SHIFT_ACTS acts.
-  const walk = (actId: string, depth: number): void => {
-    const act = scenario.acts[actId]!;
-    for (const outcome of [...act.actions, act.timeout]) {
-      if (outcome.next === null) {
-        if (depth !== STANDARD_SHIFT_ACTS) {
-          throw new Error(`branch ending at act "${actId}" has ${depth} acts, expected ${STANDARD_SHIFT_ACTS}`);
-        }
-      } else {
-        if (depth >= STANDARD_SHIFT_ACTS) {
-          throw new Error(`branch through act "${actId}" exceeds ${STANDARD_SHIFT_ACTS} acts`);
-        }
-        walk(outcome.next, depth + 1);
-      }
-    }
-  };
-  walk(scenario.startActId, 1);
-
   return scenario;
 }
 
 function assertUnique(ids: string[], what: string): void {
-  if (new Set(ids).size !== ids.length) throw new Error(`duplicate ${what}`);
+  if (new Set(ids).size !== ids.length) throw new Error(`Invalid scenario: duplicate ${what}`);
 }
 
 export function loadScenarioFile(path: string): Scenario {

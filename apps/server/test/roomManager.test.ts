@@ -61,7 +61,9 @@ describe("RoomManager", () => {
     const { code, ids } = fullRoom(rooms);
     expect(rooms.handleCommand(code, ids[0]!, { commandId: "x", command: { type: "SET_SCORE", score: 1000 } }).status).toBe("invalid");
     expect(rooms.handleCommand(code, ids[0]!, null).status).toBe("invalid");
-    expect(rooms.handleCommand(code, ids[0]!, { commandId: "y", command: { type: "SYNC_STAKE", claimId: "c1", amount: 50 } }).status).toBe("invalid");
+    expect(rooms.handleCommand(code, ids[0]!, { commandId: "y", command: { type: "PICK_ANSWER", answerId: 7 } }).status).toBe("invalid");
+    expect(rooms.handleCommand(code, ids[0]!, { commandId: "y", command: { type: "PICK_ANSWER", answerId: "x".repeat(65) } }).status).toBe("invalid");
+    expect(rooms.handleCommand(code, ids[0]!, { commandId: "y", command: { type: "CLAIM_CREATE", factId: "f" } }).status).toBe("invalid");
     expect(rooms.handleCommand(code, "intruder", { commandId: "z", command: { type: "START_GAME" } }).status).toBe("unauthorised");
     expect(rooms.handleCommand("NOPE", ids[0]!, { commandId: "z", command: { type: "START_GAME" } }).status).toBe("unauthorised");
   });
@@ -89,9 +91,9 @@ describe("RoomManager", () => {
     const { code, ids } = fullRoom(rooms);
     rooms.handleCommand(code, ids[0]!, { commandId: "s", command: { type: "START_GAME" } });
     expect(rooms.tick()).toEqual([]);
-    advance(scenario.phaseDurationsSec.ACT_SCAN * 1000);
+    advance(scenario.roundSeconds * 1000);
     expect(rooms.tick()).toEqual([code]);
-    expect(rooms.get(code)!.state.phase).toBe("ACT_RELAY");
+    expect(rooms.get(code)!.state.phase).toBe("REVEAL");
 
     ids.forEach((id) => rooms.disconnect(code, id));
     advance(ABANDONED_ROOM_MS);

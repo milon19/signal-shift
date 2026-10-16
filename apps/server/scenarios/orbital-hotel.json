@@ -1,149 +1,68 @@
 {
   "id": "orbital-hotel",
   "title": "Opening Night at the Aurora Orbital Hotel",
-  "startingStability": 100,
-  "startingSync": 10,
-  "auditsPerAct": 2,
-  "pinsPerAct": 1,
-  "phaseDurationsSec": {
-    "ACT_SCAN": 60,
-    "ACT_RELAY": 180,
-    "ACT_VERIFY": 60,
-    "ACT_COMMIT": 45,
-    "CONSEQUENCE": 20,
-    "HANDOFF": 15
-  },
-  "startActId": "docking",
-  "acts": {
-    "docking": {
-      "title": "Act 1 — The VIP Shuttle",
-      "briefing": "The VIP shuttle is approaching with nearly empty tanks. Open exactly one docking gate that leads safely to the ballroom.",
-      "facts": [
-        { "id": "gate_a_safe", "prompt": "Gate A is pressurised all the way to the ballroom.", "truth": false },
-        { "id": "gate_c_safe", "prompt": "Gate C is pressurised all the way to the ballroom.", "truth": true },
-        { "id": "blue_overload", "prompt": "The blue routes overloaded recently.", "truth": true }
+  "roundSeconds": 90,
+  "revealSeconds": 15,
+  "resultLines": [
+    "The VIPs are in cargo, the Spa is dark and the soufflé is raw. Same time next week?",
+    "One out of three. The guests will mostly remember the free drinks.",
+    "Two out of three! The reviews call it \"mostly not on fire\".",
+    "Flawless! Five stars from the Duchess — the hotel names a cocktail after your crew."
+  ],
+  "rounds": [
+    {
+      "id": "shuttle",
+      "title": "The VIP Shuttle",
+      "question": "Which gate do we open for the VIP shuttle?",
+      "answers": [
+        { "id": "gate_a", "label": "Gate A", "correct": false, "narration": "Gate A vents! The VIPs arrive windswept, furious and slightly blue." },
+        { "id": "gate_b", "label": "Gate B", "correct": false, "narration": "The VIPs are delivered to the cargo hold, between two crates of napkins." },
+        { "id": "gate_c", "label": "Gate C", "correct": true, "narration": "A buttery-smooth docking. The VIPs glide into the ballroom to applause." }
       ],
-      "clues": {
-        "Navigator": [
-          { "id": "docking.nav.1", "text": "Gate A reaches the ballroom along the BLUE route." },
-          { "id": "docking.nav.2", "text": "Gate C reaches the ballroom along the YELLOW route. Gate B only reaches the cargo hold." }
-        ],
-        "Decoder": [
-          { "id": "docking.dec.1", "text": "Status glyphs: ◇ means pressurised, ✕ means venting." },
-          { "id": "docking.dec.2", "text": "Blue routes invert after an overload: a ◇ on a blue route actually means ✕." }
-        ],
-        "Operator": [
-          { "id": "docking.op.1", "text": "Panel note: the shuttle only has fuel for ONE gate attempt." }
-        ],
-        "Auditor": [
-          { "id": "docking.aud.1", "text": "Maintenance log: the blue routes overloaded four minutes ago." }
-        ],
-        "Dispatcher": [
-          { "id": "docking.dis.1", "text": "Status board: Gate A ◇, Gate B ✕, Gate C ◇." }
-        ]
-      },
-      "actions": [
-        { "id": "open_gate_a", "label": "Open Gate A", "correct": false, "stabilityDelta": -30, "narration": "Gate A vents! The VIPs arrive windswept and furious.", "next": "power" },
-        { "id": "open_gate_b", "label": "Open Gate B", "correct": false, "stabilityDelta": -20, "narration": "The VIPs are delivered to the cargo hold, between two crates of napkins.", "next": "power" },
-        { "id": "open_gate_c", "label": "Open Gate C", "correct": true, "stabilityDelta": 0, "narration": "A smooth docking. The VIPs glide into the ballroom.", "next": "power" }
+      "clues": [
+        "Gate A reaches the ballroom on the BLUE route.",
+        "Gate C reaches the ballroom on the YELLOW route. Gate B only goes to cargo.",
+        "Status board: Gate A ◇, Gate C ◇.",
+        "◇ means safe, but blue routes flip meaning after an overload.",
+        "The blue routes overloaded four minutes ago."
       ],
-      "timeout": { "stabilityDelta": -25, "narration": "Nobody opened a gate. The shuttle circles until a tug drags it in.", "next": "power" }
+      "timeout": "Nobody opened a gate. The shuttle circles until a tug drags it in by the bumper."
     },
-    "power": {
-      "title": "Act 2 — The Power Reroute",
-      "briefing": "The ceremony needs extra power. Reroute it to one deck — but choose carefully, the hotel will remember.",
-      "facts": [
-        { "id": "line3_at_limit", "prompt": "Line 3 is at its capacity limit.", "truth": true },
-        { "id": "line1_has_capacity", "prompt": "Line 1 can take extra load.", "truth": true },
-        { "id": "spa_on_line1", "prompt": "The Spa is fed by Line 1.", "truth": false }
+    {
+      "id": "power",
+      "title": "The Power Reroute",
+      "question": "Which deck gets the extra power for the opening toast?",
+      "answers": [
+        { "id": "observatory", "label": "The Observatory", "correct": false, "narration": "The great telescope glows magnificently for an audience of zero. The toast happens in the dark." },
+        { "id": "kitchens", "label": "The Kitchens", "correct": true, "narration": "The banquet hall blazes with light. The robot chef raises a spatula in salute." },
+        { "id": "spa", "label": "The Spa", "correct": false, "narration": "The breaker blows. The Spa goes dark mid-facial and the steam room becomes a fog machine." }
       ],
-      "clues": {
-        "Navigator": [
-          { "id": "power.nav.1", "text": "Line 1 feeds the Observatory. Line 2 feeds the Kitchens. Line 3 feeds the Spa." }
-        ],
-        "Decoder": [
-          { "id": "power.dec.1", "text": "Capacity glyphs: ▲ means spare capacity, ▼ means at its limit." }
-        ],
-        "Operator": [
-          { "id": "power.op.1", "text": "Panel warning: rerouting into a line at its limit trips the breaker for the whole deck." }
-        ],
-        "Auditor": [
-          { "id": "power.aud.1", "text": "Incident history: Line 3 tripped during last week's rehearsal." }
-        ],
-        "Dispatcher": [
-          { "id": "power.dis.1", "text": "Line readouts: Line 1 ▲, Line 2 ▲, Line 3 ▼." },
-          { "id": "power.dis.2", "text": "Rumour from the crew: whoever gets power tonight gets the spotlight in the finale." }
-        ]
-      },
-      "actions": [
-        { "id": "reroute_observatory", "label": "Reroute to the Observatory", "correct": true, "stabilityDelta": 5, "narration": "The great telescope hums to life. The repair bay dims to make room.", "next": "finale_observatory" },
-        { "id": "reroute_kitchens", "label": "Reroute to the Kitchens", "correct": true, "stabilityDelta": 5, "narration": "The robot chef wakes up and starts reading the menu very literally.", "next": "finale_kitchens" },
-        { "id": "reroute_spa", "label": "Reroute to the Spa", "correct": false, "stabilityDelta": -30, "narration": "The breaker trips. The Spa deck goes dark mid-massage. The kitchens limp on emergency power.", "next": "finale_kitchens" }
+      "clues": [
+        "Line 1 feeds the Observatory. Line 2 feeds the Kitchens. Line 3 feeds the Spa.",
+        "Line readouts: Line 1 ▲, Line 2 ▲, Line 3 ▼.",
+        "▼ means a line is maxed out — add any more power and its breaker blows.",
+        "The power is for the opening toast. It's wasted on a deck with no guests on it.",
+        "Tonight's schedule: the Observatory is closed until midnight for telescope polishing."
       ],
-      "timeout": { "stabilityDelta": -20, "narration": "Power drifts to the kitchens by default.", "next": "finale_kitchens" }
+      "timeout": "Nobody flipped the switch. The toast is made by candlelight, which is a fire hazard in space."
     },
-    "finale_observatory": {
-      "title": "Finale — Fireworks from the Observatory",
-      "briefing": "The opening fireworks must launch through the right observatory window. There is only one launch.",
-      "facts": [
-        { "id": "earth_in_shadow", "prompt": "Earth is currently in eclipse shadow.", "truth": true },
-        { "id": "east_faces_moon", "prompt": "The East window faces the Moon.", "truth": true }
+    {
+      "id": "chef",
+      "title": "The Literal Robot Chef",
+      "question": "Which dish card do we feed the robot chef for the first course?",
+      "answers": [
+        { "id": "souffle", "label": "Soufflé", "correct": true, "narration": "A perfectly risen, piping-hot soufflé. The chef bows. The Duchess weeps." },
+        { "id": "sorbet", "label": "Sorbet", "correct": false, "narration": "The guests receive a frozen first course and some very cold looks." },
+        { "id": "flambe", "label": "Flambé", "correct": false, "narration": "The grill erupts. With no sprinkler, the banquet moves to the corridor." }
       ],
-      "clues": {
-        "Navigator": [
-          { "id": "obs.nav.1", "text": "Windows: North faces Earth, East faces the Moon, West faces empty space." }
-        ],
-        "Decoder": [
-          { "id": "obs.dec.1", "text": "Ceremony tradition: fireworks are launched toward the brightest object in view." }
-        ],
-        "Operator": [
-          { "id": "obs.op.1", "text": "Launch controls lock to a single window per ceremony." }
-        ],
-        "Auditor": [
-          { "id": "obs.aud.1", "text": "Telescope feed (powered tonight): Earth is in eclipse shadow for the next hour." }
-        ],
-        "Dispatcher": [
-          { "id": "obs.dis.1", "text": "Brightness board: Moon — FULL. Earth — normally brightest, check the telescope." }
-        ]
-      },
-      "actions": [
-        { "id": "launch_north", "label": "Launch through the North window", "correct": false, "stabilityDelta": -30, "narration": "The fireworks vanish into Earth's shadow. Polite applause.", "next": null },
-        { "id": "launch_east", "label": "Launch through the East window", "correct": true, "stabilityDelta": 10, "narration": "Fireworks bloom against the full Moon. The guests gasp.", "next": null },
-        { "id": "launch_west", "label": "Launch through the West window", "correct": false, "stabilityDelta": -30, "narration": "A dazzling display, witnessed by absolutely nobody.", "next": null }
+      "clues": [
+        "Dish cards: Soufflé = Oven ♨ ⟳. Sorbet = Freezer ❄ ⟳. Flambé = Grill ♨ ♨ ♨.",
+        "Card glyphs: ♨ means HEAT, ❄ means CHILL, ⟳ means repeat the step before it.",
+        "Banquet etiquette: the first course must be served WARM.",
+        "Safety log: the Grill sprinkler is off tonight. Any heat on the Grill starts a fire.",
+        "Chef's manual: a soufflé needs at least TWO heat steps, or it comes out raw."
       ],
-      "timeout": { "stabilityDelta": -30, "narration": "The fireworks fizzle on the launch rail.", "next": null }
-    },
-    "finale_kitchens": {
-      "title": "Finale — The Literal Robot Chef",
-      "briefing": "The robot chef interprets dish cards as engineering instructions. Load the one card that serves the first course safely.",
-      "facts": [
-        { "id": "grill_sprinkler_off", "prompt": "The grill sprinkler is disabled.", "truth": true },
-        { "id": "first_course_warm", "prompt": "The first course must be served warm.", "truth": true }
-      ],
-      "clues": {
-        "Navigator": [
-          { "id": "kit.nav.1", "text": "The chef's arm reaches stations in order: Grill, Oven, Freezer." }
-        ],
-        "Decoder": [
-          { "id": "kit.dec.1", "text": "Menu glyphs: ♨ means heat, ❄ means chill, ⟳ means repeat the previous step." },
-          { "id": "kit.dec.2", "text": "Banquet etiquette: the first course must be served warm." }
-        ],
-        "Operator": [
-          { "id": "kit.op.1", "text": "The chef accepts exactly one dish card for the first course." }
-        ],
-        "Auditor": [
-          { "id": "kit.aud.1", "text": "Safety log: the grill sprinkler is disabled for maintenance tonight." }
-        ],
-        "Dispatcher": [
-          { "id": "kit.dis.1", "text": "Dish cards: Soufflé = Oven ♨ ⟳. Sorbet = Freezer ❄ ⟳. Flambé = Grill ♨ ♨ ♨." }
-        ]
-      },
-      "actions": [
-        { "id": "load_souffle", "label": "Load the Soufflé card", "correct": true, "stabilityDelta": 10, "narration": "A perfectly risen soufflé. The chef bows.", "next": null },
-        { "id": "load_sorbet", "label": "Load the Sorbet card", "correct": false, "stabilityDelta": -20, "narration": "The guests receive a frozen first course and very cold looks.", "next": null },
-        { "id": "load_flambe", "label": "Load the Flambé card", "correct": false, "stabilityDelta": -40, "narration": "The grill erupts. With no sprinkler, the banquet moves to the corridor.", "next": null }
-      ],
-      "timeout": { "stabilityDelta": -30, "narration": "The chef waits patiently. So do the hungry guests.", "next": null }
+      "timeout": "The chef waits patiently for a card. So do two hundred hungry guests."
     }
-  }
+  ]
 }

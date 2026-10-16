@@ -1,5 +1,5 @@
-import type { GameCommand, Phase, Role } from "@signal-shift/shared";
-import { addPlayer, advancePhase, applyCommand, createGame, type GameState } from "../src/game/engine.js";
+import type { GameCommand } from "@signal-shift/shared";
+import { addPlayer, applyCommand, captainId, createGame, type GameState } from "../src/game/engine.js";
 import { loadDefaultScenario } from "../src/game/scenario.js";
 
 export const scenario = loadDefaultScenario();
@@ -31,21 +31,19 @@ export function expectAccepted(state: GameState, playerId: string, command: Game
   }
 }
 
-export function holder(state: GameState, role: Role): string {
-  const id = state.seats.find((p) => state.roles[p] === role);
-  if (!id) throw new Error(`nobody holds ${role}`);
+export function captain(state: GameState): string {
+  const id = captainId(state);
+  if (!id) throw new Error("no captain");
   return id;
 }
 
-export function advanceTo(state: GameState, phase: Phase, now = T0): void {
-  for (let guard = 0; state.phase !== phase; guard++) {
-    if (guard > 20) throw new Error(`never reached ${phase}`);
-    advancePhase(state, now);
-  }
+/** Id of the current round's correct (or a wrong) answer. */
+export function answer(state: GameState, correct: boolean): string {
+  return scenario.rounds[state.roundNumber - 1]!.answers.find((a) => a.correct === correct)!.id;
 }
 
-/** Plays the current act to CONSEQUENCE by committing the given action. */
-export function commit(state: GameState, actionId: string): void {
-  advanceTo(state, "ACT_COMMIT");
-  expectAccepted(state, holder(state, "Operator"), { type: "COMMIT_ACTION", actionId });
+/** Captain picks, then the host skips the reveal. Ends in the next ROUND, or RESULTS after the last. */
+export function playRound(state: GameState, correct: boolean): void {
+  expectAccepted(state, captain(state), { type: "PICK_ANSWER", answerId: answer(state, correct) });
+  expectAccepted(state, state.hostId!, { type: "ADVANCE_PHASE" });
 }

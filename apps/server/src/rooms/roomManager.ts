@@ -24,20 +24,7 @@ const commandSchema: z.ZodType<GameCommand> = z.discriminatedUnion("type", [
   z.object({ type: z.literal("START_GAME") }),
   z.object({ type: z.literal("KICK_PLAYER"), playerId: z.string().max(64) }),
   z.object({ type: z.literal("ADVANCE_PHASE") }),
-  z.object({
-    type: z.literal("CLAIM_CREATE"),
-    factId: z.string().max(64),
-    assertion: z.boolean(),
-    text: z.string().max(500),
-  }),
-  z.object({
-    type: z.literal("SYNC_STAKE"),
-    claimId: z.string().max(64),
-    amount: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  }),
-  z.object({ type: z.literal("CLAIM_VERIFY"), claimId: z.string().max(64) }),
-  z.object({ type: z.literal("DISPATCH_PIN"), clueId: z.string().max(64) }),
-  z.object({ type: z.literal("COMMIT_ACTION"), actionId: z.string().max(64) }),
+  z.object({ type: z.literal("PICK_ANSWER"), answerId: z.string().max(64) }),
   z.object({ type: z.literal("PLAY_AGAIN") }),
 ]);
 

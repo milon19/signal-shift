@@ -5,37 +5,60 @@ import { scenario } from "./helpers.js";
 const clone = () => structuredClone(scenario) as Record<string, any>;
 
 describe("scenario data", () => {
-  it("the bundled scenario is valid", () => {
-    expect(Object.keys(scenario.acts)).toHaveLength(4);
+  it("the bundled scenario has 3 rounds of 3 answers and 5 clues, one correct answer each", () => {
+    expect(scenario.rounds).toHaveLength(3);
+    for (const round of scenario.rounds) {
+      expect(round.answers).toHaveLength(3);
+      expect(round.clues).toHaveLength(5);
+      expect(round.answers.filter((a) => a.correct)).toHaveLength(1);
+    }
+    expect(scenario.rounds[0]!.answers.find((a) => a.correct)!.label).toBe("Gate C");
   });
 
-  it("rejects references to unknown acts", () => {
+  it("rejects the wrong number of rounds", () => {
     const raw = clone();
-    raw.acts.docking.actions[0].next = "nowhere";
-    expect(() => parseScenario(raw)).toThrow(/unknown act "nowhere"/);
+    raw.rounds.pop();
+    expect(() => parseScenario(raw)).toThrow(/Invalid scenario: rounds:/);
   });
 
-  it("rejects branches that are not exactly three acts", () => {
-    const raw = clone();
-    raw.acts.power.actions[0].next = null;
-    expect(() => parseScenario(raw)).toThrow(/expected 3/);
+  it("rejects the wrong number of answers or clues", () => {
+    const answers = clone();
+    answers.rounds[1].answers.pop();
+    expect(() => parseScenario(answers)).toThrow(/rounds\.1\.answers/);
+
+    const clues = clone();
+    clues.rounds[2].clues.push("one too many");
+    expect(() => parseScenario(clues)).toThrow(/rounds\.2\.clues/);
   });
 
-  it("rejects acts missing clues for a role", () => {
-    const raw = clone();
-    raw.acts.docking.clues.Auditor = [];
-    expect(() => parseScenario(raw)).toThrow();
+  it("rejects rounds without exactly one correct answer", () => {
+    const none = clone();
+    for (const a of none.rounds[0].answers) a.correct = false;
+    expect(() => parseScenario(none)).toThrow(/round "shuttle" must have exactly one correct answer \(has 0\)/);
+
+    const two = clone();
+    two.rounds[0].answers[0].correct = true;
+    expect(() => parseScenario(two)).toThrow(/has 2/);
   });
 
-  it("rejects duplicate clue ids", () => {
-    const raw = clone();
-    raw.acts.power.clues.Navigator[0].id = "docking.nav.1";
-    expect(() => parseScenario(raw)).toThrow(/duplicate clue id/);
+  it("rejects duplicate answer and round ids", () => {
+    const answers = clone();
+    answers.rounds[0].answers[1].id = answers.rounds[0].answers[0].id;
+    expect(() => parseScenario(answers)).toThrow(/duplicate answer id/);
+
+    const rounds = clone();
+    rounds.rounds[1].id = rounds.rounds[0].id;
+    expect(() => parseScenario(rounds)).toThrow(/duplicate round id/);
   });
 
-  it("rejects acts with no correct action", () => {
+  it("rejects missing fields and a wrong number of result lines", () => {
     const raw = clone();
-    for (const a of raw.acts.docking.actions) a.correct = false;
-    expect(() => parseScenario(raw)).toThrow(/no correct action/);
+    delete raw.rounds[0].timeout;
+    expect(() => parseScenario(raw)).toThrow(/rounds\.0\.timeout/);
+
+    const lines = clone();
+    lines.resultLines.pop();
+    expect(() => parseScenario(lines)).toThrow(/resultLines/);
+    expect(() => parseScenario(null)).toThrow(/Invalid scenario/);
   });
 });
